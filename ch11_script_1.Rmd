@@ -37,21 +37,88 @@ county <- read_rds("county.rds")
 
 We are interested in understanding how poverty is correlated with (and influenced by?) education.
 
+```{r}
+county
+```
+
+
+```{r}
+glimpse(county)
+```
+
+
+```{r}
+summary(county)
+```
+
+
+```{r}
+county %>%
+  select(poverty, less_than_hs) %>%
+  skim()
+```
 
 # Scene 2
 
 **Prompt** Let’s start by exploring our numerical outcome variable `poverty` and our numerical explanatory variable `less_than_hs`. What is the average poverty rate in the US? How does this compare with that of your county (if you are not from US look up Middlesex County - the county that Cambridge, MA is in)? Furthermore, what is the average percentage of adults without a high school diploma? Which state's county has the highest percentage of adults without a high school diploma?
 
+```{r}
+# Average poverty rate in the US
+
+county %>% 
+  summarise(avg_pov = mean(poverty))
+
+# Poverty rate of Middlesex County
+
+county %>% 
+  filter(name %in% "Wake County",
+         state == "NC") %>%
+  select(poverty)
+
+# Average percent of adults without a high school diploma
+
+county %>% 
+  summarise(avg_no_hdiploma = mean(less_than_hs))
+
+# Average percent of adults with a high school diploma
+
+county %>% 
+  summarise(avg_hdiploma = mean(hs))
+
+# State with the highest percentage of adults with less than a high school diploma
+
+county %>%
+  arrange(desc(less_than_hs)) %>%
+  head(1) %>%
+  select(state)
+```
 
 # Scene 3
 
 **Prompt:** What is the correlation coefficient of `poverty` and `less_than_hs`? What does it mean? What does it suggest about the relation between the percent of the population in poverty in 2018 and the percent of the population with less than a high school degree in 2014? 
-
+  
+```{r}
+county %>% 
+  summarize(correlation = cor(poverty, less_than_hs))
+```
+  
+- In social sciences, anything above .5 is considered a strong correlation. A strong positive relationship between the percent of the population in poverty in 2018 and the percent of the population with less than a high school degree in 2014
 
 # Scene 4
 
 **Prompt:** Use a scatterplot to visualize this data, including a straight line of best fit. The dependent variable is `poverty`. The independent variable is `less_than_hs`.
-
+       
+```{r}
+county %>% 
+  ggplot(aes(x = less_than_hs, y = poverty)) +
+  geom_point() +
+  labs(x = "Percent of Adults with Less than a High School Diploma", 
+       y = "Percent of County in Poverty",
+       title = "Poverty Rate and Education in US Counties",
+       subtitle = "Counties with less education have more poverty",
+       caption = "Source: https://www.ers.usda.gov/data-products/county-level-data-sets") +
+  geom_smooth(method = "lm", se = FALSE)
+```
 
 # Scene 5
 
@@ -59,11 +126,40 @@ We are interested in understanding how poverty is correlated with (and influence
 
 Here is an example: https://rpubs.com/ruchajoshi/regional_poverty
 
+```{r}
+county %>% 
+  ggplot(aes(x = less_than_hs, y = poverty, color = region)) +
+  geom_point() +
+  labs(x = "Percent of Adults with Less than a High School Diploma", 
+       y = "Percent of County in Poverty",
+       title = "Scatterplot of relationship of education level and poverty rates") +
+  transition_manual(region)
+```
 
 # Scene 6
 
 **Prompt:** Assume that we are trying to understand the causes of poverty in US counties. Chapter 11 discusses two types of approaches: modeling for explanation and modeling for prediction. (Recall the definitions of these terms.) Which kind is this? Write down some bullet points which make the case for one or the other. 
 
+Modeling for explanation vs. modeling for causation
+Explanation: trying to find causal relationships, something happens because of something. Here, we are trying to find if a lack of high school education causes poverty. 
+
+Prediction: looking for correlation.We don’t care about causation, we just want to use it to predict something
+
+Here, we are modeling for explanation since we’re trying to figure out what causes whether a lack of high school education causes poverty.
+
+In order to fit this to a Rubin Causal Model, we need to create a binary variable, in this case, whether or not the county has a good education system. 
+
+Units: Each county
+
+Treatments: good education
+
+Potential outcomes: poverty rate
+
+fundamental problem of causal inference: can only observe one outcome
+
+Here, it is also confounded by having many potential treatments - every possible variable is a potential treatment. 
+
+Because less_than_hs is a more precise measure than good_education, the relationship/association between less_than_hs and poverty is likely stronger. However, this does not change our answer about causation. In this case, the treatment would be the percent less_than_hs rather than good_education.
 
 # Scene 7
 
@@ -79,6 +175,12 @@ Fourth, recall the Rubin Causal Model and potential outcomes. Write down the uni
 
 Fifth, how do the above answers change if, instead of using `good_education`, we use `less_than_hs` instead?
 
+```{r}
+county %>% 
+  mutate(good_education = ifelse(less_than_hs < 13, 1, 0)) %>% 
+  group_by(good_education) %>% 
+  summarize(avg_poverty = mean(poverty))
+```
 
 # Scene 8
 
